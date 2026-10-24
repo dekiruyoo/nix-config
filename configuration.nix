@@ -1,13 +1,19 @@
-# Need help? man configuration.nix 5 or run nixos-help.
+# Need help? run either 'man configuration.nix 5' or 'nixos-help'.
 
 { config, pkgs, ... }:
 
 {
-  imports =
-    [ # Include the results of the hardware scan.
-      ./hardware-configuration.nix
-      ./minecarrft.nix
-    ];
+  imports = [
+    # Include the results of the hardware scan.
+    ./hardware-configuration.nix
+
+    ./AppImage/minecarrft.nix
+    ./AppImage/wabba.nix
+
+    ./virt.nix
+
+    ./hosts/t1me.nix
+  ];
 
   # Graphics settings
   services.xserver.videoDrivers = [ "nvidia" ];
@@ -15,14 +21,6 @@
     enable = true;
     enable32Bit = true;
   };
-  hardware.nvidia = {
-    modesetting.enable = true;
-    open = false;
-    package = config.boot.kernelPackages.nvidiaPackages.legacy_580; # Compatible with GT 1030.
-  };
-  
-  # Use kernel compatible with GT 1030.
-  boot.kernelPackages = pkgs.linuxPackages_6_18;
 
   # Gaming.
   programs.steam = {
@@ -32,23 +30,34 @@
   programs.gamemode.enable = true;
 
   # Enabling Flakes.
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-
-  boot.initrd.luks.devices."luks-9e5f5584-7871-469f-88a1-91190fb31789".device = "/dev/disk/by-uuid/9e5f5584-7871-469f-88a1-91190fb31789";
-  networking.hostName = "t1me"; # Define your hostname.
-  # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
-
-  # Configure network proxy if necessary
+  # Network proxy. Keeping this for reference.
   # networking.proxy.default = "http://user:password@proxy:port/";
   # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
 
   # Enable networking
   networking.networkmanager.enable = true;
+
+  services.openssh = {
+    enable = true;
+    openFirewall = true;
+  };
+
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+  };
+
+  # Tailscale
+  services.tailscale.enable = true;
 
   # Set your time zone.
   time.timeZone = "America/Sao_Paulo";
@@ -66,20 +75,6 @@
     LC_PAPER = "pt_BR.UTF-8";
     LC_TELEPHONE = "pt_BR.UTF-8";
     LC_TIME = "pt_BR.UTF-8";
-  };
-
-  # Enable the X11 windowing system.
-  # You can disable this if you're only using the Wayland session.
-  services.xserver.enable = true;
-
-  # Enable the KDE Plasma Desktop Environment.
-  services.displayManager.sddm.enable = true;
-  services.desktopManager.plasma6.enable = true;
-
-  # Configure keymap in X11
-  services.xserver.xkb = {
-    layout = "br";
-    variant = "thinkpad";
   };
 
   # Configure console keymap
@@ -104,26 +99,34 @@
     #media-session.enable = true;
   };
 
-  # Enable touchpad support (enabled default in most desktopManager).
-  services.libinput.enable = true;
-  
+  # Enable Bluetooth.
+  hardware.bluetooth.enable = true;
+  services.blueman.enable = true;
+
   # Enable Flatpak.
-  services.flatpak.enable = true;
-  services.flatpak.packages = [
-    "org.vinegarhq.Sober"
-    #"org.prismlauncher.PrismLauncher"
-    "com.heroicgameslauncher.hgl"
-  ];
-  #xdg.portal = {
-  #  extraPortals = [ pkgs.xdg-desktop-portal-gdk ];
-  #  config.common.default = "gtk";
-  #};
+  services.flatpak = {
+    enable = true;
+    packages = [
+      "org.vinegarhq.Sober"
+      "com.heroicgameslauncher.hgl"
+      "com.usebottles.bottles"
+      "com.protonvpn.www"
+      {
+        # Gale.
+        flatpakref = "https://kesomannen.com/com.kesomannen.gale.flatpakref";
+        sha256 = "d17bcebe5e6845de4e8ae541ae3e91a621c2971ed799db17f34843ec27e6de04";
+      }
+    ];
+  };
 
   # Settings for the user
   users.users."muffy" = {
     isNormalUser = true;
     description = "Muffy";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [
+      "networkmanager"
+      "wheel"
+    ];
     packages = with pkgs; [
       foot
       fuzzel
@@ -131,33 +134,34 @@
       fastfetch
     ];
   };
-  home-manager.users."muffy" = {pkgs, ... }: {
+
+  ## Home manager stuff goes here
+  home-manager.users."muffy" = { pkgs, ... }: {
+    nixpkgs.config.allowUnfree = true;
     home.packages = with pkgs; [
       atool
       httpie
+      obsidian
     ];
-    
-
-    programs.zsh.enable = true;
 
     programs.git = {
       enable = true;
       settings = {
-       init.defaultBranch = "main"; 
+        init.defaultBranch = "main";
         user = {
           name = "dekiruyoo";
-	  email = "remin-p@proton.me";
-      };
+          email = "remin-p@proton.me";
+        };
       };
     };
 
     programs.ssh = {
       enable = true;
-      extraConfig = ''
-        Host github.com
-        AddKeysToAgent yes
-        IdentityFile ~/.ssh/id_ed25519
-      '';
+      enableDefaultConfig = false;
+      settings."github.com" = {
+        AddKeysToAgent = "yes";
+        IdentityFile = "~/.ssh/id_ed25519";
+      };
     };
 
     home.stateVersion = "26.05";
@@ -166,15 +170,12 @@
   # Install firefox.
   programs.firefox.enable = true;
 
-  
-
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
-    neovim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
     wget
     keepassxc
     git
@@ -182,9 +183,24 @@
     nss
     nspr
     age
+    mesa-demos
     temurin-jre-bin-21
     temurin-jre-bin-25
     appimage-run
+    p7zip
+    qbittorrent
+    vlc
+    mpv
+    bibata-cursors
+    ethtool
+    go
+    python3
+    nixd
+    nixfmt
+    gofumpt
+    jq
+    ffmpeg
+    yt-dlp
   ];
 
   # sops + age config (for git authenticated requests)
@@ -195,6 +211,7 @@
   # Env vars
   environment.sessionVariables = {
     GITHUB_TOKEN = "/run/secrets/github_token";
+    EDITOR = "hx";
   };
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -205,23 +222,11 @@
   #   enableSSHSupport = true;
   # };
 
-  # List services that you want to enable:
-
-  # Enable the OpenSSH daemon.
-  # services.openssh.enable = true;
-
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
 
-  # This value determines the NixOS release from which the default
-  # settings for stateful data, like file locations and database versions
-  # on your system were taken. It‘s perfectly fine and recommended to leave
-  # this value at the release version of the first install of this system.
-  # Before changing this value read the documentation for this option
-  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "26.05"; # Did you read the comment?
-
+  system.stateVersion = "26.05";
 }

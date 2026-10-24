@@ -1,14 +1,22 @@
-# terminal.nix
-{ config, pkgs, lib, ... }:
+#; terminal.nix
+{ pkgs, inputs, ... }:
 
 {
+  imports = [
+    ./helix/hx.nix
+  ];
   # zsh as the real login shell (NixOS requires this on before setting it as the shell)
   programs.zsh.enable = true;
+  programs.zsh.enableCompletion = false;
   users.users."muffy".shell = pkgs.zsh;
 
   # Nerd Font
   fonts.packages = [ pkgs.nerd-fonts.jetbrains-mono ];
 
+  # Insults. Ehe.
+  security.sudo.extraConfig = "Defaults insults";
+
+  home-manager.extraSpecialArgs = { inherit inputs; };
   home-manager.users."muffy" = { pkgs, ... }: {
     programs.foot = {
       enable = true;
@@ -28,7 +36,19 @@
         light_dark = "dark";
         color_align.mode = "horizontal";
         backend = "fastfetch";
+        pride_month_disable = false;
+        pride_month_shown = [ ];
       };
+    };
+
+    programs.yazi = {
+      enable = true;
+      settings.opener.edit = [
+        {
+          run = ''${pkgs.helix}/bin/hx "$@"'';
+          block = true;
+        }
+      ];
     };
 
     # Zim: modules list, read by zimfw
@@ -40,13 +60,18 @@
       zmodule utility
       zmodule duration-info
       zmodule git-info
-      zmodule asciiship
+      zmodule prompt-pwd
+      zmodule agnoster
       zmodule zsh-users/zsh-completions --fpath src
       zmodule completion
       zmodule zsh-users/zsh-syntax-highlighting
       zmodule zsh-users/zsh-autosuggestions
     '';
 
+    programs.zsh.enable = true;
+    programs.zsh.enableCompletion = false;
+
+    #programs.zsh.completionInit = "";
     # Merges with the programs.zsh.enable already in configuration.nix
     programs.zsh.initContent = ''
       # Zim bootstrap (the official snippet from the zimfw README)
